@@ -54,6 +54,11 @@ typedef enum {
     CONTINOUS
 } conversion_rate_t;
 
+typedef enum {
+    INTERRUPTS_ON,
+    INTERRUPTS_OFF
+} interrupts_t;
+
 struct adc {
     // 1 if a channel is enabled, else 0
     unsigned int channel_enable[NUM_CHANNELS];
@@ -63,6 +68,7 @@ struct adc {
     unsigned int waterline_channel[NUM_CHANNELS];
     unsigned int numActiveChannels;
     unsigned int currentActiveChannel;
+    interrupts_t interruptsOn;
 };
 
 // Measure Vrefint to determine if ADC is operational
@@ -102,10 +108,10 @@ unsigned int getNumReadingsInFIFO(unsigned int channel);
 unsigned int isFIFOEmpty(unsigned int channel);
 
 // Turn on interrupt notification mode
-unsigned int adcInterruptOn(void);
+void adcInterruptOn(void);
 
 // Turn off interrupt notification mode
-unsigned int adcInterruptsOff(void);
+void adcInterruptsOff(void);
 
 // Set the number of conversion results for which to generate an interrupt
 void setInterruptWaterline(unsigned int channel, unsigned int waterline);
@@ -118,6 +124,6 @@ void initADCStruct(void);
 void writeSQRRegister(unsigned int channel, unsigned int pos);
 
 // Determine the next active channel to decode which channel a specific EOC interrupt pertains to
-unsigned int getNextActiveChannel(void);
+inline unsigned int getNextActiveChannel(void);
 
 #endif

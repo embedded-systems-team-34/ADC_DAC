@@ -33,6 +33,15 @@ void ADC1_2_IRQHandler() {
         push(&q[queue_channel], ADC1->DR);
         // Get the next channel to convert
         getNextActiveChannel();
+        // Check if the fifo data count is equal to water line and generate interrupt iff true
+        if ((getNumReadingsInFIFO(queue_channel) == a.waterline_channel[queue_channel]) && (a.interruptsOn == INTERRUPTS_ON)) {
+            EXTI->SWIER1 |= EXTI_SWIER1_SWI0;
+        }
+            
+#if DEBUG
+        buf_size = sprintf((char *)buffer, "%u %u\r\n",queue_channel, ADC1->DR);
+        USART_Write(USART2, buffer, buf_size);
+#endif
     }
 }
 
@@ -276,10 +285,12 @@ void startConversion(void) {
     }
     
     if (a.mode == SINGLE) {
+        ADC1->CFGR &= ~ADC_CFGR_CONT;
         ADC1->CR |= ADC_CR_ADSTART;    
     // Must be CONTINOUS Mode    
     } else {
-        
+        ADC1->CFGR |= ADC_CFGR_CONT;
+        ADC1->CR |= ADC_CR_ADSTART;
     } 
 }
 
@@ -295,6 +306,7 @@ unsigned int getData(unsigned int channel) {
 void initADCStruct() {
     unsigned int i = 0;
     
+    a.interruptsOn = INTERRUPTS_OFF;
     a.mode = SINGLE;
     a.numActiveChannels = 0;
     a.currentActiveChannel = 0;
@@ -308,10 +320,18 @@ void initADCStruct() {
 }
 
 // Turn on interrupt notification mode
-unsigned int adcInterruptOn(void);
+void adcInterruptOn(void) {
+    // Configure the mask bit in EXTI_IMR
+    EXTI->IMR1 |= EXTI_IMR1_IM0;
+    NVIC_EnableIRQ(EXTI0_IRQn);
+    a.interruptsOn = INTERRUPTS_ON;
+}
 
 // Turn off interrupt notification mode
-unsigned int adcInterruptsOff(void);
+void adcInterruptsOff(void) {
+    EXTI->IMR1 &= ~EXTI_IMR1_IM0;
+    a.interruptsOn = INTERRUPTS_OFF;
+}
 
 // Set the number of conversion results for which to generate an interrupt
 void setInterruptWaterline(unsigned int channel, unsigned int waterline) {
@@ -374,7 +394,7 @@ void writeSQRRegister(unsigned int channel, unsigned int pos) {
     }            
 }
 
-unsigned int getNextActiveChannel(void) {
+inline unsigned int getNextActiveChannel(void) {
     
     unsigned int i = 0;
     unsigned int next_index = 0;
