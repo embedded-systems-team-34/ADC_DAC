@@ -18,12 +18,13 @@
 #if DEBUG
 #include "UART.h"
 #include <stdio.h>
+#include "led.h"
 #endif
 
 #include "queue.h"
 
 #define VREF_MIN_THRESHOLD (400)
-#define NUM_CHANNELS (16)
+#define NUM_CHANNELS (17)
 
 /*******************************************************************************
 --------------------------------------------------------------------------------
@@ -48,6 +49,21 @@ ADC123_IN15 - PB0  - LCD
 ADC123_IN16 - PB1  - LCD
 *******************************************************************************/
 
+typedef enum {
+    SINGLE,
+    CONTINOUS
+} conversion_rate_t;
+
+struct adc {
+    // 1 if a channel is enabled, else 0
+    unsigned int channel_enable[NUM_CHANNELS];
+    // Conversion Rate for ADC1
+    conversion_rate_t mode;
+    // Waterline per channel which determines when interrupt is triggered
+    unsigned int waterline_channel[NUM_CHANNELS];
+    unsigned int numActiveChannels;
+    unsigned int currentActiveChannel;
+};
 
 // Measure Vrefint to determine if ADC is operational
 // returns - 1 self test pass, 0 self test fails 
@@ -66,12 +82,12 @@ void adcSetModeContinous(void);
 void adcSetModeSingle(void);
 
 // returns 1 for continous operation, 0 for single
-unsigned int adcGetMode(void);
+conversion_rate_t adcGetMode(void);
 
 // Perform necessary setup to setup specific channel for conversion
 // chan - mask of channels that are enabled where bit 0 corresponds to channel 0, 
 // bit 1 to channel 1 etc.
-void adcInitChannel(unsigned int chan);
+void adcInitChannel(unsigned int channel);
 
 // Start a conversion with the currently set mode
 void startConversion(void);
@@ -92,6 +108,16 @@ unsigned int adcInterruptOn(void);
 unsigned int adcInterruptsOff(void);
 
 // Set the number of conversion results for which to generate an interrupt
-unsigned int setInterruptWaterline(unsigned int channel, unsigned int waterline);
+void setInterruptWaterline(unsigned int channel, unsigned int waterline);
+
+void initADCStruct(void);
+
+// Write the SQR register
+// channel - channel to write 
+// pos - the position of the channel in the sequence
+void writeSQRRegister(unsigned int channel, unsigned int pos);
+
+// Determine the next active channel to decode which channel a specific EOC interrupt pertains to
+unsigned int getNextActiveChannel(void);
 
 #endif

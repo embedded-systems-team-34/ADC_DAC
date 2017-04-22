@@ -17,19 +17,30 @@ unsigned int buf_size;
 #endif
 
 struct queue q[16];
+struct adc a; 
 
 // ADC1 Interrupt Handler
 void ADC1_2_IRQHandler() {
     unsigned int whichInterrupt = ADC1->ISR;
-    // End of sampling flag, set by completion of conversion of any channel at the end of sampling phase
-    if ((whichInterrupt & ADC_ISR_EOSMP) != 0) {
-        
+    // Channel of queue to store the ADC result in
+    unsigned int queue_channel;
+    
+    Green_LED_On();
+    // End of conversion flag, set by completion of conversion of any channel at the end 
+    if ((whichInterrupt & ADC_ISR_EOC) != 0) {
+        queue_channel = a.currentActiveChannel;
+        // Push the sampled data into the queue
+        push(&q[queue_channel], ADC1->DR);
+        // Get the next channel to convert
+        getNextActiveChannel();
     }
 }
 
 void adcInit() {
     
     unsigned int i,j;
+    
+    initADCStruct();
     
     // Enable ADCEN bit 13 of AHB2 clock enable register
 	RCC->AHB2ENR |= RCC_AHB2ENR_ADCEN;
@@ -63,7 +74,7 @@ void adcInit() {
     
     NVIC_EnableIRQ(ADC1_2_IRQn);
     // Enable end of sampling flag interrupt
-    ADC1->IER |= ADC_IER_EOSMP;
+    ADC1->IER |= (ADC_ISR_EOC);
     
 }
 
@@ -92,6 +103,7 @@ unsigned int adcSelfTest(void) {
     // Verify that VREFEN is as expected
     
     measured_vref = ADC1->DR;
+    ADC1->ISR |= ADC_ISR_EOS;
     
 #if DEBUG
     buf_size = sprintf((char *)buffer, "VREFEN reading %u\r\n", ADC1->DR);
@@ -141,27 +153,135 @@ unsigned int getNumReadingsInFIFO(unsigned int channel) {
 }
 
 // Set ADC to contionusly convert the currently configured channels 
-void adcSetModeContinous(void) {}
+void adcSetModeContinous(void) {
+    a.mode = CONTINOUS;
+}
 
 // Set ADC to convert the currently confiugred channels for a single cycle
-void adcSetModeSingle(void) {}
+void adcSetModeSingle(void) {
+    a.mode = SINGLE;
+}
 
 // returns 1 for continous operation, 0 for single
-unsigned int adcGetMode(void) {}
+conversion_rate_t adcGetMode(void) {
+    return a.mode;
+}
 
 // Perform necessary setup to setup specific channel for conversion
 // chan - channel to enable
 // bit 1 to channel 1 etc.
-void adcInitChannel(unsigned int chan) {
-    // Turn on CLK for Port channel is located on
+void adcInitChannel(unsigned int channel) {
     
-    // Close analog switch control for given port
+    unsigned int i = 0;
+    unsigned int channel_loop_count = 0;
     
-    // Set sequencing for all channels that are on
+    if (channel < NUM_CHANNELS) { 
+        
+        a.channel_enable[channel] = 1;
+        if (a.numActiveChannels != NUM_CHANNELS) {
+            a.numActiveChannels += 1;
+        }
+        
+        // Turn on CLK for Port channel is located on
+        // PORTC Channels
+        if (((channel > 0) && (channel <= 4)) || (channel == 13) || (channel == 14)) {
+            RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;
+        // PORTA
+        } else if (channel >= 5 && channel <= 12) {
+            RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
+        // PORTB
+        } else if ((channel == 15) || (channel == 16)) {
+            RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
+        }
+        
+        // Close analog switch control for given port
+        switch(channel) {
+            case 0:
+                break;
+            case 1:
+                GPIOC->ASCR |= 1;
+                break;
+            case 2:
+                GPIOC->ASCR |= 2;
+                break;
+            case 3:
+                GPIOC->ASCR |= 4;
+                break;
+            case 4:
+                GPIOC->ASCR |= 8;
+                break;
+            case 5:
+                GPIOA->ASCR |= 1;
+                break;
+            case 6:
+                GPIOA->ASCR |= 2;
+                break;
+            case 7:
+                GPIOA->ASCR |= 4;
+                break;
+            case 8:
+                GPIOA->ASCR |= 8;
+                break;
+            case 9:
+                GPIOA->ASCR |= 16;
+                break;
+            case 10:
+                GPIOA->ASCR |= 32;
+                break;
+            case 11:
+                GPIOA->ASCR |= 64;
+                break;
+            case 12:
+                GPIOA->ASCR |= 128;
+                break;
+            case 13:
+                GPIOC->ASCR |= 16;
+                break;
+            case 14:
+                GPIOC->ASCR |= 32;
+                break;
+            case 15:
+                GPIOB->ASCR |= 1;
+                break;
+            case 16:
+                GPIOB->ASCR |= 2;
+                break;
+            
+        }
+        
+        if (a.numActiveChannels != 0) {
+            for (i = 0; i < NUM_CHANNELS; i++) {
+                if (a.channel_enable[i] == 1) {
+                    writeSQRRegister(i, channel_loop_count);
+                    channel_loop_count += 1;
+                }
+            }
+            // Set sequencing for all channels that are on
+            ADC1->SQR1 |= (a.numActiveChannels-1 & ADC_SQR1_L);
+        }
+    }
 }
 
 // Start a conversion with the currently set mode
-void startConversion(void) {}
+void startConversion(void) {
+    
+    unsigned int i = 0;
+    
+    // Get the first active channel
+    for (i = 0; i < NUM_CHANNELS; i++) {
+        if (a.channel_enable[i] == 1) {
+            a.currentActiveChannel = i;
+            break;
+        }
+    }
+    
+    if (a.mode == SINGLE) {
+        ADC1->CR |= ADC_CR_ADSTART;    
+    // Must be CONTINOUS Mode    
+    } else {
+        
+    } 
+}
 
 // Get most recent adc conversion value for a specified channel samples 
 unsigned int getData(unsigned int channel) {
@@ -172,6 +292,21 @@ unsigned int getData(unsigned int channel) {
     return 0;    
 }
 
+void initADCStruct() {
+    unsigned int i = 0;
+    
+    a.mode = SINGLE;
+    a.numActiveChannels = 0;
+    a.currentActiveChannel = 0;
+    
+    for ( i = 0; i < NUM_CHANNELS; i++) {
+        // Initalize all channels to off
+        a.channel_enable[i] = 0;
+        // Default all waterlines to 1
+        a.waterline_channel[i] = 1;        
+    }
+}
+
 // Turn on interrupt notification mode
 unsigned int adcInterruptOn(void);
 
@@ -179,4 +314,83 @@ unsigned int adcInterruptOn(void);
 unsigned int adcInterruptsOff(void);
 
 // Set the number of conversion results for which to generate an interrupt
-unsigned int setInterruptWaterline(unsigned int channel, unsigned int waterline);
+void setInterruptWaterline(unsigned int channel, unsigned int waterline) {
+    if (channel < NUM_CHANNELS) {
+        a.waterline_channel[channel] = waterline;
+    }
+}
+
+void writeSQRRegister(unsigned int channel, unsigned int pos) {
+    switch (pos) {
+    
+        case 0:
+            ADC1->SQR1 |= ((channel << 6) & ADC_SQR1_SQ1);
+            break;
+        case 1:
+            ADC1->SQR1 |= ((channel << 12) & ADC_SQR1_SQ2);
+            break;
+        case 2:
+            ADC1->SQR1 |= ((channel << 18) & ADC_SQR1_SQ3);
+            break;
+        case 3:
+            ADC1->SQR1 |= ((channel << 24) & ADC_SQR1_SQ4);
+            break;            
+        case 4:
+            ADC1->SQR2 |= ((channel) & ADC_SQR2_SQ5);
+            break;
+        case 5:
+            ADC1->SQR2 |= ((channel << 6) & ADC_SQR2_SQ6);
+            break;      
+        case 6:
+            ADC1->SQR2 |= ((channel << 12) & ADC_SQR2_SQ7);
+            break; 
+        case 7:
+            ADC1->SQR2 |= ((channel << 18) & ADC_SQR2_SQ8);
+            break;        
+        case 8:
+            ADC1->SQR2 |= ((channel << 24) & ADC_SQR2_SQ9);
+            break;              
+        case 9:
+            ADC1->SQR3 |= ((channel) & ADC_SQR3_SQ10);
+            break;     
+        case 10:
+            ADC1->SQR3 |= ((channel << 6) & ADC_SQR3_SQ11);
+            break; 
+        case 11:
+            ADC1->SQR3 |= ((channel << 12) & ADC_SQR3_SQ12);
+            break;     
+        case 12:
+            ADC1->SQR3 |= ((channel << 18) & ADC_SQR3_SQ13);
+            break;      
+        case 13:
+            ADC1->SQR3 |= ((channel << 24) & ADC_SQR3_SQ14);
+            break;      
+        case 14:
+            ADC1->SQR4 |= ((channel) & ADC_SQR4_SQ15);
+            break;   
+        case 15:
+            ADC1->SQR4 |= ((channel << 6) & ADC_SQR4_SQ16);
+            break;
+    }            
+}
+
+unsigned int getNextActiveChannel(void) {
+    
+    unsigned int i = 0;
+    unsigned int next_index = 0;
+    
+    // If only one active channel then next channel is current channel
+    if (a.numActiveChannels == 1) {
+        return a.currentActiveChannel;
+    // Else have more than one channel so determine next channel in the sequence
+    } else {
+        for (i = 1; i < NUM_CHANNELS; i++) {
+            next_index = (i + a.currentActiveChannel) % NUM_CHANNELS;
+            if (a.channel_enable[next_index] == 1) {
+                a.currentActiveChannel = next_index;
+                return a.currentActiveChannel;
+            }
+        }
+    }
+    return 0;
+}

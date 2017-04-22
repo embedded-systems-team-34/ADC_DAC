@@ -49,19 +49,16 @@ void adc1Init() {
 int main(void){
 	
 	//struct queue q;
-	//uint8_t buffer[200];
+	uint8_t buffer[200];
 	//uint16_t t;
 	
-	//unsigned int n;
+	unsigned int n;
 	//
-	//uint16_t i = 0;
+	uint16_t i = 0;
 	//
 	System_Clock_Init(); // Switch System Clock = 80 MHz
 	LED_Init();
 	UART2_Init(); 
-    
-	Green_LED_On();
-	Red_LED_On();
 	
 	//adc1Init();
 	//
@@ -89,8 +86,18 @@ int main(void){
     
     adcInit();
     adcSelfTest();
+    adcInitChannel(5);
+    adcInitChannel(6);
+	n = sprintf((char *)buffer, "Is empty %u\r\n", getNumReadingsInFIFO(5));
+    USART_Write(USART2, buffer, n); 
+    startConversion();
+    for (i = 0; i < 10000; i++) {};
+	n = sprintf((char *)buffer, "Is empty %u\r\n", getNumReadingsInFIFO(5));
+    USART_Write(USART2, buffer, n);		
+	 	n = sprintf((char *)buffer, "Data %u\r\n", getData(5));
+    USART_Write(USART2, buffer, n);		
 	
 	
-	while (1){
+	while (1){       
 	}
 }
