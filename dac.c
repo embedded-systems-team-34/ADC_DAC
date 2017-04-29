@@ -10,331 +10,116 @@
 ******************************************************************************/
 
 #include "dac.h"
+#include "queue.h"
 
-// 100 Hz sawtooth wave sampled at 10 kHz
-uint16_t sawtooth_lookup_table[NUM_ELEMENTS] = {
-40,
-81,
-122,
-163,
-204,
-245,
-286,
-327,
-368,
-409,
-450,
-491,
-532,
-573,
-614,
-655,
-696,
-737,
-778,
-819,
-859,
-900,
-941,
-982,
-1023,
-1064,
-1105,
-1146,
-1187,
-1228,
-1269,
-1310,
-1351,
-1392,
-1433,
-1474,
-1515,
-1556,
-1597,
-1638,
-1678,
-1719,
-1760,
-1801,
-1842,
-1883,
-1924,
-1965,
-2006,
-2047,
-2088,
-2129,
-2170,
-2211,
-2252,
-2293,
-2334,
-2375,
-2416,
-2457,
-2497,
-2538,
-2579,
-2620,
-2661,
-2702,
-2743,
-2784,
-2825,
-2866,
-2907,
-2948,
-2989,
-3030,
-3071,
-3112,
-3153,
-3194,
-3235,
-3276,
-3316,
-3357,
-3398,
-3439,
-3480,
-3521,
-3562,
-3603,
-3644,
-3685,
-3726,
-3767,
-3808,
-3849,
-3890,
-3931,
-3972,
-4013,
-4054,
-4095};
+struct queue dac_q;
+struct dac d; 
 
-
-// 100 Hz square wave sampled at 10 kHz
-uint16_t square_lookup_table[NUM_ELEMENTS] = {
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-4095,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0};
-
-// cosine signal with a frequency of 100 Hz when sampled at 10 kHz
-uint16_t cos_lookup_table[NUM_ELEMENTS] = {
-4090,
-4078,
-4058,
-4030,
-3994,
-3951,
-3900,
-3841,
-3776,
-3703,
-3625,
-3540,
-3449,
-3352,
-3250,
-3144,
-3033,
-2919,
-2801,
-2680,
-2556,
-2431,
-2304,
-2176,
-2047,
-1918,
-1790,
-1663,
-1538,
-1414,
-1293,
-1175,
-1061,
-950,
-844,
-742,
-645,
-554,
-469,
-391,
-318,
-253,
-194,
-143,
-100,
-64,
-36,
-16,
-4,
-0,
-4,
-16,
-36,
-64,
-100,
-143,
-194,
-253,
-318,
-391,
-469,
-554,
-645,
-742,
-844,
-950,
-1061,
-1175,
-1293,
-1414,
-1538,
-1663,
-1790,
-1918,
-2047,
-2176,
-2304,
-2431,
-2556,
-2680,
-2801,
-2919,
-3033,
-3144,
-3250,
-3352,
-3449,
-3540,
-3625,
-3703,
-3776,
-3841,
-3900,
-3951,
-3994,
-4030,
-4058,
-4078,
-4090,
-4095};
-
-void dacInit(void) {
-    RCC->APB1ENR1 |= RCC_APB1ENR1_DAC1EN;
-}
-
-void singleConversion(unsigned int channel, uint16_t data) {
-    if (channel == 1) {
-        DAC->CR |= DAC_CR_EN1;    
-        DAC->DHR12R1 = data;
-			  DAC->SWTRIGR |= DAC_SWTRIGR_SWTRIG1;
-    } 
-    if (channel == 2) {
-        DAC->CR |= DAC_CR_EN2;
-        DAC->DHR12R2 = data;
-			  DAC->SWTRIGR |= DAC_SWTRIGR_SWTRIG2;
+void TIM2_IRQHandler(void) {
+    uint16_t which_interrupt = TIM2->SR;
+	uint16_t data;
+    
+    if (d.conversion_rate == DAC_CONTINOUS) {
+        // Check for overflow interrupt
+        if (((which_interrupt & TIM_SR_UIF) == TIM_SR_UIF)) {
+            if (d.data_source == FIXED) {
+                data = d.fixedDataSoruce_ptr[d.fixed_data_source_index];
+                d.fixed_data_source_index += 1;
+                d.fixed_data_source_index = d.fixed_data_source_index % d.fixedDataSourceLength;
+            } else {
+                data = pop(&dac_q);
+            }
+            singleConversion(data);
+            TIM2->SR &= ~TIM_SR_UIF; // Clear overflow interrupt
+        }
     }
 }
 
+void dacInit(void) {
+    RCC->APB1ENR1 |= RCC_APB1ENR1_DAC1EN;
+    initDacStruct();
+}
+
+void initDacStruct() {
+    d.conversion_rate = DAC_SINGLE;
+    d.data_source = FIXED;
+    d.fixedDataSourceLength = 0;
+    d.sample_period = 1;
+    d.fixed_data_source_index = 0;
+    d.active_channel = 2;
+}
+
+void setDacActiveChannel(unsigned int channel) {
+    if (channel == 1) {
+        d.active_channel = 1;
+    } 
+    if (channel == 2) {
+        d.active_channel = 2;
+    }    
+}
+
+void singleConversion(uint16_t data) {
+    if (d.active_channel == 1) {
+        DAC->CR |= DAC_CR_EN1;    
+        DAC->DHR12R1 = data;
+		DAC->SWTRIGR |= DAC_SWTRIGR_SWTRIG1;
+    } 
+    if (d.active_channel == 2) {
+        DAC->CR |= DAC_CR_EN2;
+        DAC->DHR12R2 = data;
+		DAC->SWTRIGR |= DAC_SWTRIGR_SWTRIG2;
+    }
+}
+
+void dacInitQueue(void) {
+    init_queue(&dac_q);
+}
+
+void writeDacOutputData(uint16_t data) {
+    push(&dac_q, data);
+}
+
+void setDacContinous(uint16_t sampling_period) {
+    d.conversion_rate = DAC_CONTINOUS;  
+    d.sample_period = sampling_period;
+    configureDacContinousMode(sampling_period);    
+}
+
+void setDacSingle() {
+    d.conversion_rate = DAC_SINGLE;  
+    TIM2->DIER &= ~TIM_DIER_UIE;
+}
+void setDacFixedDataSource(uint16_t *datasource_ptr, uint16_t length) {
+    d.fixedDataSourceLength = length;
+    d.fixedDataSoruce_ptr = datasource_ptr;
+    d.data_source = FIXED;
+}
+
+void setDacQueueDataSource() {
+    d.data_source = DYNAMIC_FIFO;
+}
+
+// interrupt_period - Count of 50 us resolution of interrupt period -> 20 represents 1 ms (20 * 50 us) = 1 ms
+void configureDacContinousMode(uint16_t interrupt_period) {
+    // Enable the interrupt handler
+    NVIC_EnableIRQ(TIM2_IRQn); 
+    
+    // Enable clock of timer 2
+    RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN;
+    
+    // Set Prescaler
+    // 80 MHz / 4000 = 20 KHz -> 50 us
+    TIM2->PSC = 3999;
+    
+    TIM2->ARR = d.sample_period-1;
+    TIM2->EGR |= TIM_EGR_UG;
+    
+    // Unmask TIM2 Interrupts
+    TIM2->DIER |= TIM_DIER_UIE;
+    
+    TIM2->CR1 |= TIM_CR1_CEN;
+}
+
+uint16_t getSamplesInDacQueue(void) {
+    return elementsInQueue(&dac_q);
+}

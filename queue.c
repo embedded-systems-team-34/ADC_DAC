@@ -13,8 +13,8 @@
 
 void init_queue(struct queue* q) {
   q->in_ptr = 0;
-	q->out_ptr = 0;
-	q->length = 0;
+  q->out_ptr = 0;
+  q->length = 0;
 }
 
 uint16_t isEmpty(struct queue* q) {

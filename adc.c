@@ -163,16 +163,16 @@ unsigned int getNumReadingsInFIFO(unsigned int channel) {
 
 // Set ADC to contionusly convert the currently configured channels 
 void adcSetModeContinous(void) {
-    a.mode = CONTINOUS;
+    a.mode = ADC_CONTINOUS;
 }
 
 // Set ADC to convert the currently confiugred channels for a single cycle
 void adcSetModeSingle(void) {
-    a.mode = SINGLE;
+    a.mode = ADC_SINGLE;
 }
 
 // returns 1 for continous operation, 0 for single
-conversion_rate_t adcGetMode(void) {
+adc_conversion_rate_t adcGetMode(void) {
     return a.mode;
 }
 
@@ -284,7 +284,7 @@ void startConversion(void) {
         }
     }
     
-    if (a.mode == SINGLE) {
+    if (a.mode == ADC_SINGLE) {
         ADC1->CFGR &= ~ADC_CFGR_CONT;
         ADC1->CR |= ADC_CR_ADSTART;    
     // Must be CONTINOUS Mode    
@@ -307,7 +307,7 @@ void initADCStruct() {
     unsigned int i = 0;
     
     a.interruptsOn = INTERRUPTS_OFF;
-    a.mode = SINGLE;
+    a.mode = ADC_SINGLE;
     a.numActiveChannels = 0;
     a.currentActiveChannel = 0;
     

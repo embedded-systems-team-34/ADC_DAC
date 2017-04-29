@@ -50,9 +50,9 @@ ADC123_IN16 - PB1  - LCD
 *******************************************************************************/
 
 typedef enum {
-    SINGLE,
-    CONTINOUS
-} conversion_rate_t;
+    ADC_SINGLE,
+    ADC_CONTINOUS
+} adc_conversion_rate_t;
 
 typedef enum {
     INTERRUPTS_ON,
@@ -63,7 +63,7 @@ struct adc {
     // 1 if a channel is enabled, else 0
     unsigned int channel_enable[NUM_CHANNELS];
     // Conversion Rate for ADC1
-    conversion_rate_t mode;
+    adc_conversion_rate_t mode;
     // Waterline per channel which determines when interrupt is triggered
     unsigned int waterline_channel[NUM_CHANNELS];
     unsigned int numActiveChannels;
@@ -88,7 +88,7 @@ void adcSetModeContinous(void);
 void adcSetModeSingle(void);
 
 // returns 1 for continous operation, 0 for single
-conversion_rate_t adcGetMode(void);
+adc_conversion_rate_t adcGetMode(void);
 
 // Perform necessary setup to setup specific channel for conversion
 // chan - mask of channels that are enabled where bit 0 corresponds to channel 0, 
