@@ -4,6 +4,7 @@
 #include "UART.h"
 #include "queue.h"
 #include "adc.h"
+#include "dac.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -55,15 +56,17 @@ int main(void){
     //    USART_Write(USART2, buffer, n); 
 	//}
     
-    adcInit();
-    adcSelfTest();
-    adcInitChannel(5);
-	  n = sprintf((char *)buffer, "Is empty %u\r\n", getNumReadingsInFIFO(5));
-    USART_Write(USART2, buffer, n); 
-    adcInterruptOn();
-    setInterruptWaterline(5,1);
-    startConversion();
-	
+   // adcInit();
+   // adcSelfTest();
+   // adcInitChannel(5);
+	 // n = sprintf((char *)buffer, "Is empty %u\r\n", getNumReadingsInFIFO(5));
+   // USART_Write(USART2, buffer, n); 
+   // adcInterruptOn();
+   // setInterruptWaterline(5,1);
+   // startConversion();
+	 
+	dacInit(); 
+	singleConversion(1, 0xaaa);
 	
 	while (1){       
 	}
