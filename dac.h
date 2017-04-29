@@ -46,7 +46,7 @@ void setDacSingle(void);
 void setDacFixedDataSource(uint16_t *datasource_ptr, uint16_t length);
 void setDacQueueDataSource(void);
 void setDacActiveChannel( unsigned int channel);
-void configureDacContinousMode(uint16_t interrupt_period);
+void configureDacContinousMode(void);
 uint16_t getSamplesInDacQueue(void);
 
 // Helper Functions

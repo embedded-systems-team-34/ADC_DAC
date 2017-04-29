@@ -11,7 +11,7 @@
 #ifndef ADC_H
 #define ADC_H
 
-#define DEBUG (1)
+#define DEBUG (0)
 
 #include "stm32l476xx.h"
 
@@ -69,6 +69,7 @@ struct adc {
     unsigned int numActiveChannels;
     unsigned int currentActiveChannel;
     interrupts_t interruptsOn;
+    uint16_t sampling_period;
 };
 
 // Measure Vrefint to determine if ADC is operational
@@ -82,7 +83,7 @@ void adcInit(void);
 void adcInitQueues(void);
 
 // Set ADC to contionusly convert the currently configured channels 
-void adcSetModeContinous(void);
+void adcSetModeContinous(uint16_t sampling_period);
 
 // Set ADC to convert the currently confiugred channels for a single cycle
 void adcSetModeSingle(void);
@@ -125,5 +126,9 @@ void writeSQRRegister(unsigned int channel, unsigned int pos);
 
 // Determine the next active channel to decode which channel a specific EOC interrupt pertains to
 unsigned int getNextActiveChannel(void);
+
+void configureAdcContinousMode(void);
+
+void singleStartConversion(void);
 
 #endif

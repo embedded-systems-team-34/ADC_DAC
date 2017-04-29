@@ -25,7 +25,6 @@ void ADC1_2_IRQHandler() {
     // Channel of queue to store the ADC result in
     unsigned int queue_channel;
     
-    Green_LED_On();
     // End of conversion flag, set by completion of conversion of any channel at the end 
     if ((whichInterrupt & ADC_ISR_EOC) != 0) {
         queue_channel = a.currentActiveChannel;
@@ -162,7 +161,8 @@ unsigned int getNumReadingsInFIFO(unsigned int channel) {
 }
 
 // Set ADC to contionusly convert the currently configured channels 
-void adcSetModeContinous(void) {
+void adcSetModeContinous(uint16_t sampling_period) {
+    a.sampling_period = sampling_period;
     a.mode = ADC_CONTINOUS;
 }
 
@@ -285,13 +285,16 @@ void startConversion(void) {
     }
     
     if (a.mode == ADC_SINGLE) {
-        ADC1->CFGR &= ~ADC_CFGR_CONT;
-        ADC1->CR |= ADC_CR_ADSTART;    
+        singleStartConversion();  
     // Must be CONTINOUS Mode    
     } else {
-        ADC1->CFGR |= ADC_CFGR_CONT;
-        ADC1->CR |= ADC_CR_ADSTART;
+        configureAdcContinousMode();
     } 
+}
+
+void singleStartConversion(void) {
+    ADC1->CFGR &= ~ADC_CFGR_CONT;
+    ADC1->CR |= ADC_CR_ADSTART;    
 }
 
 // Get most recent adc conversion value for a specified channel samples 
@@ -310,6 +313,7 @@ void initADCStruct() {
     a.mode = ADC_SINGLE;
     a.numActiveChannels = 0;
     a.currentActiveChannel = 0;
+    a.sampling_period = 1;
     
     for ( i = 0; i < NUM_CHANNELS; i++) {
         // Initalize all channels to off
@@ -413,4 +417,37 @@ unsigned int getNextActiveChannel(void) {
         }
     }
     return 0;
+}
+
+// interrupt_period - Count of 50 us resolution of interrupt period -> 20 represents 1 ms (20 * 50 us) = 1 ms
+void configureAdcContinousMode() {
+    // Enable the interrupt handler
+    NVIC_EnableIRQ(TIM3_IRQn); 
+    
+    // Enable clock of timer 2
+    RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;
+    
+    // Set Prescaler
+    // 80 MHz / 4000 = 20 KHz -> 50 us
+    TIM3->PSC = 3999;
+    
+    TIM3->ARR = a.sampling_period-1;  
+    TIM3->EGR |= TIM_EGR_UG;
+    
+    // Unmask TIM2 Interrupts
+    TIM3->DIER |= TIM_DIER_UIE;
+    
+    TIM3->CR1 |= TIM_CR1_CEN;
+}
+
+void TIM3_IRQHandler(void) {
+    uint16_t which_interrupt = TIM3->SR;
+    
+    // Check for overflow interrupt
+    if (((which_interrupt & TIM_SR_UIF) == TIM_SR_UIF)) {
+        if (a.mode == ADC_CONTINOUS) {
+            singleStartConversion();
+        }
+        TIM3->SR &= ~TIM_SR_UIF; // Clear overflow interrupt
+    }
 }

@@ -17,7 +17,7 @@ struct dac d;
 
 void TIM2_IRQHandler(void) {
     uint16_t which_interrupt = TIM2->SR;
-	uint16_t data;
+	static uint16_t data;
     
     if (d.conversion_rate == DAC_CONTINOUS) {
         // Check for overflow interrupt
@@ -27,7 +27,12 @@ void TIM2_IRQHandler(void) {
                 d.fixed_data_source_index += 1;
                 d.fixed_data_source_index = d.fixed_data_source_index % d.fixedDataSourceLength;
             } else {
-                data = pop(&dac_q);
+                // If the queue is not empty then grab the next value
+                if (isEmpty(&dac_q) == 0) {
+                    data = pop(&dac_q);
+                } else {    // It is time to output a value but the queue is empty so there is nothing new to output, hold the last sample and use the data from the last sample
+                    data = data;
+                }
             }
             singleConversion(data);
             TIM2->SR &= ~TIM_SR_UIF; // Clear overflow interrupt
@@ -82,7 +87,7 @@ void writeDacOutputData(uint16_t data) {
 void setDacContinous(uint16_t sampling_period) {
     d.conversion_rate = DAC_CONTINOUS;  
     d.sample_period = sampling_period;
-    configureDacContinousMode(sampling_period);    
+    configureDacContinousMode();    
 }
 
 void setDacSingle() {
@@ -100,7 +105,7 @@ void setDacQueueDataSource() {
 }
 
 // interrupt_period - Count of 50 us resolution of interrupt period -> 20 represents 1 ms (20 * 50 us) = 1 ms
-void configureDacContinousMode(uint16_t interrupt_period) {
+void configureDacContinousMode() {
     // Enable the interrupt handler
     NVIC_EnableIRQ(TIM2_IRQn); 
     
