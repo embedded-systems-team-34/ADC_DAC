@@ -394,7 +394,7 @@ void writeSQRRegister(unsigned int channel, unsigned int pos) {
     }            
 }
 
-inline unsigned int getNextActiveChannel(void) {
+unsigned int getNextActiveChannel(void) {
     
     unsigned int i = 0;
     unsigned int next_index = 0;

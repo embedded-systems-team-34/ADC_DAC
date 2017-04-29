@@ -66,8 +66,8 @@ int main(void){
    // startConversion();
 	 
 	dacInit(); 
-	singleConversion(1, 0xaaa);
+  configureSystemTick();
 	
-	while (1){       
+	while (1){   
 	}
 }

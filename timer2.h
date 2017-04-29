@@ -1,25 +1,17 @@
 /******************************************************************************
-* FILENAME : dac.h          
+* FILENAME : timer2.h          
 *
 * DESCRIPTION : 
-*     daac function prototypes
+*     timer function prototypes
 *
 * AUTHOR: 
 *     Donald MacIntyre - djm4912@rit.edu
 *
 ******************************************************************************/
-#ifndef DAC_H
-#define DAC_H
+#ifndef TIMER2_H
+#define TIMER2_H
 
 #include "stm32l476xx.h"
 
-#define NUM_ELEMENTS (100)
-
-// DAC1_OUT1 - PA4
-// DAC1_OUT2 - PA5
-
-void dacInit(void);
-
-void singleConversion(unsigned int channel, uint16_t data);
 
 #endif

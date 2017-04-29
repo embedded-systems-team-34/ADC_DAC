@@ -124,6 +124,6 @@ void initADCStruct(void);
 void writeSQRRegister(unsigned int channel, unsigned int pos);
 
 // Determine the next active channel to decode which channel a specific EOC interrupt pertains to
-inline unsigned int getNextActiveChannel(void);
+unsigned int getNextActiveChannel(void);
 
 #endif
