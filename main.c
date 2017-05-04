@@ -15,10 +15,12 @@
 #define NUM_ELEMENTS (100)
 #define NUM_DEMOS (14)
 #define DEMO_ENTRIES (NUM_DEMOS + 3)
+#define INVALID_DEMO_NUM (99)
 
 unsigned int randomNum(unsigned int min, unsigned int max);
 
 uint16_t lut_index = 0;
+uint16_t flag = 0;
 
 // 100 Hz sawtooth wave sampled at 10 kHz
 uint16_t sawtooth_lookup_table[NUM_ELEMENTS] = {
@@ -568,6 +570,186 @@ void runAdcBIST() {
 
 }
 
+void runAdcSingleConversion() {
+    
+    int n;
+    uint8_t buffer[1000];
+
+    n = sprintf((char *)buffer, "Read the voltage on ADC channel 5 -> PA0\r\n");
+    USART_Write(USART2, buffer, n);  
+
+// Test a single conversion on a Single Channel
+    adcInit();
+    adcSetModeSingle();
+    // Prepare to sample on PA0
+    adcInitChannel(5);    
+    startConversion();
+    // Wait until the data is avaliable
+    while (isFIFOEmpty(5) == 1);
+    // Get the number of data samples to ensure only one is present
+    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
+    USART_Write(USART2, buffer, n);  
+
+    // Read back the single data sample
+    n = sprintf((char *)buffer, "ADC sampled value: %u\r\n", getData(5));
+    USART_Write(USART2, buffer, n);   
+
+}
+
+void runAdcMultiConversion() {
+    
+    int n;
+    uint8_t buffer[1000];
+
+    n = sprintf((char *)buffer, "Read the voltage on ADC channel 5 -> PA0 and ADC channel 6 -> PA1\r\n");
+    USART_Write(USART2, buffer, n);  
+    
+// Test a single conversion on a Two Channels Concurrently
+    adcInit();
+    adcSetModeSingle();
+    // Prepare to sample on PA0
+    adcInitChannel(5);
+    // Prepare to sample on PA1
+    adcInitChannel(6);
+    startConversion();
+    // Wait until the data is avaliable
+    while ((isFIFOEmpty(5) == 1) && (isFIFOEmpty(6) == 1));
+    // Get the number of data samples to ensure only one is present
+    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
+    USART_Write(USART2, buffer, n);  
+    n = sprintf((char *)buffer, "Number of readings in channel 6 FIFO %u\r\n", getNumReadingsInFIFO(6));
+    USART_Write(USART2, buffer, n);  
+
+    // Read back the single data sample
+    n = sprintf((char *)buffer, "ADC sampled value on PA0: %u\r\n", getData(5));
+    USART_Write(USART2, buffer, n);   
+    n = sprintf((char *)buffer, "ADC sampled value on PA1: %u\r\n", getData(6));
+    USART_Write(USART2, buffer, n);  
+}
+
+void runAdcSingleInterruptsOn() {
+    
+    int n;
+    uint8_t buffer[1000];
+    uint8_t i = 0;
+
+    n = sprintf((char *)buffer, "Read the voltage on ADC channel 5 -> PA0 and verify a SW interrupt occurs once 50 samples are obtained\r\n");
+    USART_Write(USART2, buffer, n);  
+    
+// Test Continous Conversion with interrupts notification on a single channel
+    adcInit();
+    // Prepare to sample on PA0
+    adcInitChannel(5);
+    // Configure for sampling at a rate of 10 kHz
+    adcSetModeContinous(2);
+    // Set interrupts waterline such that we are not notified until we have 50 samples
+    setInterruptWaterline(5,50);    
+    // Turn on interrupts such that ADC will notify when a certain amount of data has been obtained
+    adcInterruptOn();
+    // Start the conversion
+    startConversion();    
+    // Wait for the ADC SW interrupt
+    while (flag == 0);
+    // Get the number of readings in waiting	
+    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
+    USART_Write(USART2, buffer, n);  
+    // Print out the 50 readings
+    for (i = 0; i < 50; i++) {
+        n = sprintf((char *)buffer, "Reading %u was %u\r\n", i,getData(5));
+        USART_Write(USART2, buffer, n); 
+    }
+    adcInterruptsOff();
+    
+}
+
+void runAdcMultiInterruptsOn() {
+    
+    int n;
+    uint8_t buffer[1000];
+    uint8_t i = 0;
+
+    n = sprintf((char *)buffer, "Read the voltage on ADC channel 5 (PA0) and ADC channel 6 (PA1) and verify a SW interrupt occurs once 50 samples are obtained\r\n");
+    USART_Write(USART2, buffer, n);  
+
+// Test Continous Conversion with interrupts notification on multiple channels
+    adcInit();
+    // Prepare to sample on PA0
+    adcInitChannel(5);
+    adcInitChannel(6);
+    // Prepare to sample on PA1
+    // Configure for sampling at a rate of 10 kHz
+    adcSetModeContinous(2);
+    // Set interrupts waterline such that we are not notified until we have 50 samples
+    setInterruptWaterline(5,50);  
+    setInterruptWaterline(6,50);      
+    // Turn on interrupts such that ADC will notify when a certain amount of data has been obtained
+    adcInterruptOn();
+    // Start the conversion
+    startConversion();    
+    // Wait for the ADC SW interrupt
+    while (flag == 0);
+    // Get the number of readings in waiting	
+    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
+    USART_Write(USART2, buffer, n);  
+    // Print out the 50 readings
+    for (i = 0; i < 50; i++) {
+        n = sprintf((char *)buffer, "Reading %u was %u\r\n", i,getData(5));
+        USART_Write(USART2, buffer, n); 
+    }
+    
+    // Get the number of readings in waiting	
+    n = sprintf((char *)buffer, "Number of readings in channel 6 FIFO %u\r\n", getNumReadingsInFIFO(6));
+    USART_Write(USART2, buffer, n);  
+    // Print out the 50 readings
+    for (i = 0; i < 50; i++) {
+        n = sprintf((char *)buffer, "Reading %u was %u\r\n", i,getData(6));
+        USART_Write(USART2, buffer, n); 
+    }
+    
+    adcInterruptsOff();
+    
+}
+
+void runADCDACJoint() {
+    
+    int n;
+    uint8_t buffer[1000];
+    uint16_t dac_data = 0;
+
+    n = sprintf((char *)buffer, "Read the voltage on ADC channel 5 (PA0) loopback samples to DAC channel 2 PA5\r\n");
+    n += sprintf((char *)buffer+n, "Use the function generator to generate the input waveform on PA0. The sampling rate is configured for 10 kHz so note the Nyquist rate is 5 kHz\r\n");
+    n += sprintf((char *)buffer+n, "THIS TEST WILL RUN FOREVER AND NEEDS A MANUAL RESET TO THE STM32 TO RUN THE NEXT TEST\r\n");
+    USART_Write(USART2, buffer, n);   
+
+// Set the ADC To sample at 10 kHz on channel PA0
+// Loopback the sampled signal on PA0 to the DAC and output the sampled signal at a rate of 10 kHz
+
+    adcInit();
+    // Prepare to sample on PA0
+    adcInitChannel(5);
+    // Configure for sampling at a rate of 10 kHz
+    adcSetModeContinous(2);
+    // Set interrupts waterline such that we are not notified until we have 50 samples  
+    // Start the conversion
+    startConversion();    
+    
+    dacInit(); 
+    // Select the square waveform
+    setDacQueueDataSource();
+    setDacActiveChannel(2);  
+    // Specify a sample rate of 10 khz -> 100 us (2 * 50 us)
+    setDacContinous(2); 
+    // Feed the DAC FIFO 
+    while(1) {
+        // If there is an ADC sample ready (ADC queue not empty then feed the DAC)
+        if (isFIFOEmpty(5) == 0) {
+            dac_data = getData(5);
+            writeDacOutputData(dac_data);
+        }
+    }
+    
+}
+
 // Run the requested demo_index
 void runDemo(unsigned int demo_index) {
     
@@ -609,14 +791,22 @@ void runDemo(unsigned int demo_index) {
             runAdcBIST();
             break;
         case 9:
+            runAdcSingleConversion();
             break;
         case 10:
+            runAdcMultiConversion();
             break;            
         case 11:
+            runAdcSingleInterruptsOn();
             break;   
         case 12:
+            runAdcMultiInterruptsOn();
             break;   
+        /**********************************************************************************************
+        JOINT ADC/DAC TEST CODE 
+        **********************************************************************************************/
         case 13:
+            runADCDACJoint();
             break;  
             
         default:
@@ -626,7 +816,6 @@ void runDemo(unsigned int demo_index) {
     }
 }
 
-uint16_t flag = 0;
 unsigned int demo_index = 0;
 
 // ADC Waterline Interrupt
@@ -643,13 +832,9 @@ unsigned int randomNum(unsigned int min, unsigned int max) {
 }
 
 unsigned int parseUserInput(char *string,unsigned int length) {
-    // Invalid command length so do nothing
-    
-    int n;
-    uint8_t buffer[100];
-    
+    // Invalid length so do nothing and return a invalid demo
     if (length == 0) {
-        return 0;
+        return INVALID_DEMO_NUM;
     } else {
         return atoi(string);
     } 
@@ -685,151 +870,10 @@ unsigned int getLine() {
 }
 
 int main(void){
-    
-    int n = 0;
-    uint16_t i = 0;
-    uint8_t buffer[200]; 
 
 	System_Clock_Init(); // Switch System Clock = 80 MHz
     UART2_Init(); 
     LED_Init();
-
-// Test a single conversion on a Single Channel
-#if 0
-    adcInit();
-    adcSetModeSingle();
-    // Prepare to sample on PA0
-    adcInitChannel(5);    
-    startConversion();
-    // Wait until the data is avaliable
-    while (isFIFOEmpty(5) == 1);
-    // Get the number of data samples to ensure only one is present
-    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
-    USART_Write(USART2, buffer, n);  
-
-    // Read back the single data sample
-    n = sprintf((char *)buffer, "ADC sampled value: %u\r\n", getData(5));
-    USART_Write(USART2, buffer, n);   
-#endif
-
-// Test a single conversion on a Two Channels Concurrently
-#if 0
-    adcInit();
-    adcSetModeSingle();
-    // Prepare to sample on PA0
-    adcInitChannel(5);
-    // Prepare to sample on PA1
-    adcInitChannel(6);
-    startConversion();
-    // Wait until the data is avaliable
-    while ((isFIFOEmpty(5) == 1) && (isFIFOEmpty(6) == 1));
-    // Get the number of data samples to ensure only one is present
-    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
-    USART_Write(USART2, buffer, n);  
-    n = sprintf((char *)buffer, "Number of readings in channel 6 FIFO %u\r\n", getNumReadingsInFIFO(6));
-    USART_Write(USART2, buffer, n);  
-
-    // Read back the single data sample
-    n = sprintf((char *)buffer, "ADC sampled value on PA0: %u\r\n", getData(5));
-    USART_Write(USART2, buffer, n);   
-    n = sprintf((char *)buffer, "ADC sampled value on PA1: %u\r\n", getData(6));
-    USART_Write(USART2, buffer, n);  
-#endif
-
-// Test Continous Conversion with interrupts notification on a single channel
-#if 0
-    adcInit();
-    // Prepare to sample on PA0
-    adcInitChannel(5);
-    // Configure for sampling at a rate of 10 kHz
-    adcSetModeContinous(2);
-    // Set interrupts waterline such that we are not notified until we have 50 samples
-    setInterruptWaterline(5,50);    
-    // Turn on interrupts such that ADC will notify when a certain amount of data has been obtained
-    adcInterruptOn();
-    // Start the conversion
-    startConversion();    
-    // Wait for the ADC SW interrupt
-    while (flag == 0);
-    // Get the number of readings in waiting	
-    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
-    USART_Write(USART2, buffer, n);  
-    // Print out the 50 readings
-    for (i = 0; i < 50; i++) {
-        n = sprintf((char *)buffer, "Reading %u was %u\r\n", i,getData(5));
-        USART_Write(USART2, buffer, n); 
-    }
-#endif
-
-// Test Continous Conversion with interrupts notification on multiple channels
-#if 0
-    adcInit();
-    // Prepare to sample on PA0
-    adcInitChannel(5);
-    adcInitChannel(6);
-    // Prepare to sample on PA1
-    // Configure for sampling at a rate of 10 kHz
-    adcSetModeContinous(2);
-    // Set interrupts waterline such that we are not notified until we have 50 samples
-    setInterruptWaterline(5,50);  
-    setInterruptWaterline(6,50);      
-    // Turn on interrupts such that ADC will notify when a certain amount of data has been obtained
-    adcInterruptOn();
-    // Start the conversion
-    startConversion();    
-    // Wait for the ADC SW interrupt
-    while (flag == 0);
-    // Get the number of readings in waiting	
-    n = sprintf((char *)buffer, "Number of readings in channel 5 FIFO %u\r\n", getNumReadingsInFIFO(5));
-    USART_Write(USART2, buffer, n);  
-    // Print out the 50 readings
-    for (i = 0; i < 50; i++) {
-        n = sprintf((char *)buffer, "Reading %u was %u\r\n", i,getData(5));
-        USART_Write(USART2, buffer, n); 
-    }
-    
-    // Get the number of readings in waiting	
-    n = sprintf((char *)buffer, "Number of readings in channel 6 FIFO %u\r\n", getNumReadingsInFIFO(6));
-    USART_Write(USART2, buffer, n);  
-    // Print out the 50 readings
-    for (i = 0; i < 50; i++) {
-        n = sprintf((char *)buffer, "Reading %u was %u\r\n", i,getData(6));
-        USART_Write(USART2, buffer, n); 
-    }
-#endif
-
-/**********************************************************************************************
-JOINT ADC/DAC TEST CODE 
-**********************************************************************************************/
-
-// Set the ADC To sample at 10 kHz on channel PA0
-// Loopback the sampled signal on PA0 to the DAC and output the sampled signal at a rate of 10 kHz
-
-#if 0
-    adcInit();
-    // Prepare to sample on PA0
-    adcInitChannel(5);
-    // Configure for sampling at a rate of 10 kHz
-    adcSetModeContinous(2);
-    // Set interrupts waterline such that we are not notified until we have 50 samples  
-    // Start the conversion
-    startConversion();    
-    
-    dacInit(); 
-    // Select the square waveform
-    setDacQueueDataSource();
-    setDacActiveChannel(2);  
-    // Specify a sample rate of 10 khz -> 100 us (2 * 50 us)
-    setDacContinous(2); 
-    // Feed the DAC FIFO 
-    while(1) {
-        // If there is an ADC sample ready (ADC queue not empty then feed the DAC)
-        if (isFIFOEmpty(5) == 0) {
-            dac_data = getData(5);
-            writeDacOutputData(dac_data);
-        }
-    }
-#endif
     
 	while (1) {   
         printDemos();
