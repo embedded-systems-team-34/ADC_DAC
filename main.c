@@ -441,7 +441,6 @@ void runDacDynamicSourceConstant() {
     // Give the DAC an initial value
     writeDacOutputData(0xfff);
     dacInit(); 
-    // Select the square waveform
     setDacQueueDataSource();
     setDacActiveChannel(2);  
     // Specify a sample rate of 10 khz -> 100 us (2 * 50 us)
@@ -470,7 +469,6 @@ void runDacDynamicSourceTriangleWave() {
     // Give the DAC an initial value
     writeDacOutputData(dac_data);
     dacInit(); 
-    // Select the square waveform
     setDacQueueDataSource();
     setDacActiveChannel(2);  
     // Specify a sample rate of 10 khz -> 100 us (2 * 50 us)
@@ -501,7 +499,6 @@ void runDacDynamicSourceAWGN() {
     // Give the DAC an initial value
     writeDacOutputData(dac_data);
     dacInit(); 
-    // Select the square waveform
     setDacQueueDataSource();
     setDacActiveChannel(2);  
     // Specify a sample rate of 10 khz -> 100 us (2 * 50 us)
@@ -530,7 +527,6 @@ void runDacDynamicSourceCosAWGN() {
     // Give the DAC an initial value
     writeDacOutputData(dac_data);
     dacInit(); 
-    // Select the square waveform
     setDacQueueDataSource();
     setDacActiveChannel(2);  
     // Specify a sample rate of 10 khz -> 100 us (2 * 50 us)
