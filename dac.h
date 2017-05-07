@@ -2,7 +2,7 @@
 * FILENAME : dac.h          
 *
 * DESCRIPTION : 
-*     daac function prototypes
+*     DAC function prototypes
 *
 * AUTHOR: 
 *     Donald MacIntyre - djm4912@rit.edu

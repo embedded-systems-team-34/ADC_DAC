@@ -72,6 +72,8 @@ struct adc {
     uint16_t sampling_period;
 };
 
+// ADC Interface Functions
+
 // Measure Vrefint to determine if ADC is operational
 // returns - 1 self test pass, 0 self test fails 
 unsigned int adcSelfTest(void);
@@ -79,17 +81,11 @@ unsigned int adcSelfTest(void);
 // Initalization ADC1, turn ADC1 on and perform calibration
 void adcInit(void);
 
-// Setup the FIFOs for data storage on all channels
-void adcInitQueues(void);
-
 // Set ADC to contionusly convert the currently configured channels 
 void adcSetModeContinous(uint16_t sampling_period);
 
 // Set ADC to convert the currently confiugred channels for a single cycle
 void adcSetModeSingle(void);
-
-// returns 1 for continous operation, 0 for single
-adc_conversion_rate_t adcGetMode(void);
 
 // Perform necessary setup to setup specific channel for conversion
 // chan - mask of channels that are enabled where bit 0 corresponds to channel 0, 
@@ -117,17 +113,25 @@ void adcInterruptsOff(void);
 // Set the number of conversion results for which to generate an interrupt
 void setInterruptWaterline(unsigned int channel, unsigned int waterline);
 
+// Determine the next active channel to decode which channel a specific EOC interrupt pertains to
+unsigned int getNextActiveChannel(void);
+
+void configureAdcContinousMode(void);
+
+// ADC Helper Functions
+
+// Setup the FIFOs for data storage on all channels
+void adcInitQueues(void);
+
+// returns 1 for continous operation, 0 for single
+adc_conversion_rate_t adcGetMode(void);
+
 void initADCStruct(void);
 
 // Write the SQR register
 // channel - channel to write 
 // pos - the position of the channel in the sequence
 void writeSQRRegister(unsigned int channel, unsigned int pos);
-
-// Determine the next active channel to decode which channel a specific EOC interrupt pertains to
-unsigned int getNextActiveChannel(void);
-
-void configureAdcContinousMode(void);
 
 void singleStartConversion(void);
 

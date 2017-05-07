@@ -734,8 +734,8 @@ void runADCDACJoint() {
     startConversion();    
     
     dacInit(); 
-    // Select the square waveform
     setDacQueueDataSource();
+    // Select PA5 as output channel
     setDacActiveChannel(2);  
     // Specify a sample rate of 10 khz -> 100 us (2 * 50 us)
     setDacContinous(2); 
@@ -820,10 +820,11 @@ unsigned int demo_index = 0;
 
 // ADC Waterline Interrupt
 void EXTI0_IRQHandler() {
-    // Clear the interrupt
+    // ADC interrupt code here
     Red_LED_Toggle();
     flag = 1;
     // Clear the pending interrupt by writing a 1 to the pending interrupt bit
+    // Do not remove or this interrupt will fire continously 
     EXTI->PR1 &= EXTI_PR1_PIF0;
 }
 
@@ -875,9 +876,10 @@ int main(void){
     UART2_Init(); 
     LED_Init();
     
+    // Main loop 
 	while (1) {   
-        printDemos();
-        demo_index = getLine();
-        runDemo(demo_index);
+        printDemos(); // Display all possible demos to the serial port
+        demo_index = getLine();     // Get user specified demo index 
+        runDemo(demo_index);    // Run the specified demo
 	}
 }

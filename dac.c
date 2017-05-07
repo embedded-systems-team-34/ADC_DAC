@@ -2,7 +2,7 @@
 * FILENAME : dac.c      
 *
 * DESCRIPTION : 
-*     dac implementation
+*     STM32 DAC implementation
 *
 * AUTHOR: 
 *     Donald MacIntyre - djm4912@rit.edu
@@ -12,46 +12,18 @@
 #include "dac.h"
 #include "queue.h"
 
+// DAC dynamic data queue
 struct queue dac_q;
+// DAC structure containing mode information
 struct dac d; 
 
-void TIM2_IRQHandler(void) {
-    uint16_t which_interrupt = TIM2->SR;
-	static uint16_t data;
-    
-    if (d.conversion_rate == DAC_CONTINOUS) {
-        // Check for overflow interrupt
-        if (((which_interrupt & TIM_SR_UIF) == TIM_SR_UIF)) {
-            if (d.data_source == FIXED) {
-                data = d.fixedDataSoruce_ptr[d.fixed_data_source_index];
-                d.fixed_data_source_index += 1;
-                d.fixed_data_source_index = d.fixed_data_source_index % d.fixedDataSourceLength;
-            } else {
-                // If the queue is not empty then grab the next value
-                if (isEmpty(&dac_q) == 0) {
-                    data = pop(&dac_q);
-                } else {    // It is time to output a value but the queue is empty so there is nothing new to output, hold the last sample and use the data from the last sample
-                    data = data;
-                }
-            }
-            singleConversion(data);
-            TIM2->SR &= ~TIM_SR_UIF; // Clear overflow interrupt
-        }
-    }
-}
+/*******************************************************************************
+* DAC Interface Functions
+*******************************************************************************/
 
 void dacInit(void) {
     RCC->APB1ENR1 |= RCC_APB1ENR1_DAC1EN;
     initDacStruct();
-}
-
-void initDacStruct() {
-    d.conversion_rate = DAC_SINGLE;
-    d.data_source = FIXED;
-    d.fixedDataSourceLength = 0;
-    d.sample_period = 1;
-    d.fixed_data_source_index = 0;
-    d.active_channel = 2;
 }
 
 void setDacActiveChannel(unsigned int channel) {
@@ -74,10 +46,6 @@ void singleConversion(uint16_t data) {
         DAC->DHR12R2 = data;
 		DAC->SWTRIGR |= DAC_SWTRIGR_SWTRIG2;
     }
-}
-
-void dacInitQueue(void) {
-    init_queue(&dac_q);
 }
 
 void writeDacOutputData(uint16_t data) {
@@ -104,6 +72,57 @@ void setDacQueueDataSource() {
     d.data_source = DYNAMIC_FIFO;
 }
 
+uint16_t getSamplesInDacQueue(void) {
+    return elementsInQueue(&dac_q);
+}
+
+/*******************************************************************************
+* DAC Interrupt Service Routines
+*******************************************************************************/
+
+// Timer 2 overflow ISR to trigger DAC interface
+void TIM2_IRQHandler(void) {
+    uint16_t which_interrupt = TIM2->SR;
+	static uint16_t data;
+    
+    if (d.conversion_rate == DAC_CONTINOUS) {
+        // Check for overflow interrupt
+        if (((which_interrupt & TIM_SR_UIF) == TIM_SR_UIF)) {
+            if (d.data_source == FIXED) {
+                data = d.fixedDataSoruce_ptr[d.fixed_data_source_index];
+                d.fixed_data_source_index += 1;
+                d.fixed_data_source_index = d.fixed_data_source_index % d.fixedDataSourceLength;
+            } else {
+                // If the queue is not empty then grab the next value
+                if (isEmpty(&dac_q) == 0) {
+                    data = pop(&dac_q);
+                } else {    // It is time to output a value but the queue is empty so there is nothing new to output, hold the last sample and use the data from the last sample
+                    data = data;
+                }
+            }
+            singleConversion(data);
+            TIM2->SR &= ~TIM_SR_UIF; // Clear overflow interrupt
+        }
+    }
+}
+
+/*******************************************************************************
+* DAC Hepler Functions
+*******************************************************************************/
+
+void initDacStruct() {
+    d.conversion_rate = DAC_SINGLE;
+    d.data_source = FIXED;
+    d.fixedDataSourceLength = 0;
+    d.sample_period = 1;
+    d.fixed_data_source_index = 0;
+    d.active_channel = 2;
+}
+
+void dacInitQueue(void) {
+    init_queue(&dac_q);
+}
+
 // interrupt_period - Count of 50 us resolution of interrupt period -> 20 represents 1 ms (20 * 50 us) = 1 ms
 void configureDacContinousMode() {
     // Enable the interrupt handler
@@ -123,8 +142,4 @@ void configureDacContinousMode() {
     TIM2->DIER |= TIM_DIER_UIE;
     
     TIM2->CR1 |= TIM_CR1_CEN;
-}
-
-uint16_t getSamplesInDacQueue(void) {
-    return elementsInQueue(&dac_q);
 }

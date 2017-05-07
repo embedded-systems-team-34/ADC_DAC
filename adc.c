@@ -16,33 +16,14 @@ uint8_t buffer[200];
 unsigned int buf_size;
 #endif
 
+// ADC Data Queues
 struct queue q[16];
+// ADC structure containing mode information
 struct adc a; 
 
-// ADC1 Interrupt Handler
-void ADC1_2_IRQHandler() {
-    unsigned int whichInterrupt = ADC1->ISR;
-    // Channel of queue to store the ADC result in
-    unsigned int queue_channel;
-    
-    // End of conversion flag, set by completion of conversion of any channel at the end 
-    if ((whichInterrupt & ADC_ISR_EOC) != 0) {
-        queue_channel = a.currentActiveChannel;
-        // Push the sampled data into the queue
-        push(&q[queue_channel], ADC1->DR);
-        // Get the next channel to convert
-        getNextActiveChannel();
-        // Check if the fifo data count is equal to water line and generate interrupt iff true
-        if ((getNumReadingsInFIFO(queue_channel) == a.waterline_channel[queue_channel]) && (a.interruptsOn == INTERRUPTS_ON)) {
-            EXTI->SWIER1 |= EXTI_SWIER1_SWI0;
-        }
-            
-#if DEBUG
-        buf_size = sprintf((char *)buffer, "%u %u\r\n",queue_channel, ADC1->DR);
-        USART_Write(USART2, buffer, buf_size);
-#endif
-    }
-}
+/*******************************************************************************
+* ADC Interface Functions
+*******************************************************************************/
 
 void adcInit() {
     
@@ -134,16 +115,6 @@ unsigned int adcSelfTest(void) {
     }    
 }
 
-void adcInitQueues(void) {
-    
-    unsigned int i = 0;
-    
-    // Initalize the queues, one for each channel
-    for (i = 0; i < NUM_CHANNELS; i++) {
-        init_queue(&q[i]);
-    }
-}
-
 unsigned int isFIFOEmpty(unsigned int channel) {
     // If valid channel then get number entries of FIFO
     if (channel < NUM_CHANNELS) {
@@ -169,11 +140,6 @@ void adcSetModeContinous(uint16_t sampling_period) {
 // Set ADC to convert the currently confiugred channels for a single cycle
 void adcSetModeSingle(void) {
     a.mode = ADC_SINGLE;
-}
-
-// returns 1 for continous operation, 0 for single
-adc_conversion_rate_t adcGetMode(void) {
-    return a.mode;
 }
 
 // Perform necessary setup to setup specific channel for conversion
@@ -292,11 +258,6 @@ void startConversion(void) {
     } 
 }
 
-void singleStartConversion(void) {
-    ADC1->CFGR &= ~ADC_CFGR_CONT;
-    ADC1->CR |= ADC_CR_ADSTART;    
-}
-
 // Get most recent adc conversion value for a specified channel samples 
 unsigned int getData(unsigned int channel) {
     // If valid channel then get number entries of FIFO
@@ -304,23 +265,6 @@ unsigned int getData(unsigned int channel) {
         return (pop(&q[channel]));
     }
     return 0;    
-}
-
-void initADCStruct() {
-    unsigned int i = 0;
-    
-    a.interruptsOn = INTERRUPTS_OFF;
-    a.mode = ADC_SINGLE;
-    a.numActiveChannels = 0;
-    a.currentActiveChannel = 0;
-    a.sampling_period = 1;
-    
-    for ( i = 0; i < NUM_CHANNELS; i++) {
-        // Initalize all channels to off
-        a.channel_enable[i] = 0;
-        // Default all waterlines to 1
-        a.waterline_channel[i] = 1;        
-    }
 }
 
 // Turn on interrupt notification mode
@@ -342,6 +286,71 @@ void setInterruptWaterline(unsigned int channel, unsigned int waterline) {
     if (channel < NUM_CHANNELS) {
         a.waterline_channel[channel] = waterline;
     }
+}
+
+/*******************************************************************************
+* ADC Interrupt Service Routines 
+*******************************************************************************/
+
+void TIM3_IRQHandler(void) {
+    uint16_t which_interrupt = TIM3->SR;
+    
+    // Check for overflow interrupt
+    if (((which_interrupt & TIM_SR_UIF) == TIM_SR_UIF)) {
+        if (a.mode == ADC_CONTINOUS) {
+            singleStartConversion();
+        }
+        TIM3->SR &= ~TIM_SR_UIF; // Clear overflow interrupt
+    }
+}
+
+// ADC1 Interrupt Handler
+void ADC1_2_IRQHandler() {
+    unsigned int whichInterrupt = ADC1->ISR;
+    // Channel of queue to store the ADC result in
+    unsigned int queue_channel;
+    
+    // End of conversion flag, set by completion of conversion of any channel at the end 
+    if ((whichInterrupt & ADC_ISR_EOC) != 0) {
+        queue_channel = a.currentActiveChannel;
+        // Push the sampled data into the queue
+        push(&q[queue_channel], ADC1->DR);
+        // Get the next channel to convert
+        getNextActiveChannel();
+        // Check if the fifo data count is equal to water line and generate interrupt iff true
+        if ((getNumReadingsInFIFO(queue_channel) == a.waterline_channel[queue_channel]) && (a.interruptsOn == INTERRUPTS_ON)) {
+            EXTI->SWIER1 |= EXTI_SWIER1_SWI0;
+        }
+            
+#if DEBUG
+        buf_size = sprintf((char *)buffer, "%u %u\r\n",queue_channel, ADC1->DR);
+        USART_Write(USART2, buffer, buf_size);
+#endif
+    }
+}
+
+/*******************************************************************************
+* ADC Helper Functions
+*******************************************************************************/
+
+void adcInitQueues(void) {
+    
+    unsigned int i = 0;
+    
+    // Initalize the queues, one for each channel
+    for (i = 0; i < NUM_CHANNELS; i++) {
+        init_queue(&q[i]);
+    }
+}
+
+// returns 1 for continous operation, 0 for single
+adc_conversion_rate_t adcGetMode(void) {
+    return a.mode;
+}
+
+void singleStartConversion(void) {
+    ADC1->CFGR &= ~ADC_CFGR_CONT;
+    ADC1->CR |= ADC_CR_ADSTART;    
 }
 
 void writeSQRRegister(unsigned int channel, unsigned int pos) {
@@ -419,6 +428,23 @@ unsigned int getNextActiveChannel(void) {
     return 0;
 }
 
+void initADCStruct() {
+    unsigned int i = 0;
+    
+    a.interruptsOn = INTERRUPTS_OFF;
+    a.mode = ADC_SINGLE;
+    a.numActiveChannels = 0;
+    a.currentActiveChannel = 0;
+    a.sampling_period = 1;
+    
+    for ( i = 0; i < NUM_CHANNELS; i++) {
+        // Initalize all channels to off
+        a.channel_enable[i] = 0;
+        // Default all waterlines to 1
+        a.waterline_channel[i] = 1;        
+    }
+}
+
 // interrupt_period - Count of 50 us resolution of interrupt period -> 20 represents 1 ms (20 * 50 us) = 1 ms
 void configureAdcContinousMode() {
     // Enable the interrupt handler
@@ -438,16 +464,4 @@ void configureAdcContinousMode() {
     TIM3->DIER |= TIM_DIER_UIE;
     
     TIM3->CR1 |= TIM_CR1_CEN;
-}
-
-void TIM3_IRQHandler(void) {
-    uint16_t which_interrupt = TIM3->SR;
-    
-    // Check for overflow interrupt
-    if (((which_interrupt & TIM_SR_UIF) == TIM_SR_UIF)) {
-        if (a.mode == ADC_CONTINOUS) {
-            singleStartConversion();
-        }
-        TIM3->SR &= ~TIM_SR_UIF; // Clear overflow interrupt
-    }
 }
