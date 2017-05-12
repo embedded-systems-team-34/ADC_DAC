@@ -335,9 +335,9 @@ uint16_t cos_lookup_table[NUM_ELEMENTS] = {
 char help_text[DEMO_ENTRIES][100] = {
     "**************************************",
     "0 DAC  - Perform Single Conversion",
-    "1 DAC  - Perform Continous Conversion of cos",
-    "2 DAC  - Perform Continous Conversion of Sawtooth",
-    "3 DAC  - Perform Continous Conversion of Square wave",
+    "1 DAC  - Perform Continuous Conversion of cos",
+    "2 DAC  - Perform Continuous Conversion of Sawtooth",
+    "3 DAC  - Perform Continuous Conversion of Square wave",
     "4 DAC  - Dynamic FIFO Data source fed with Constant value",
     "5 DAC  - Dynamic FIFO Data source fed with a triangle wave",
     "6 DAC  - Dynamic FIFO Data source fed by white noise",
@@ -345,8 +345,8 @@ char help_text[DEMO_ENTRIES][100] = {
     "8 ADC  - Test ADC self test mode",
     "9 ADC  - Test a Single Conversion on a single channel",
     "10 ADC - Test single conversion on multiple channels",    
-    "11 ADC - Test continous conversion with interrupt notification - single channel", 
-    "12 ADC - Test continous conversion with interrupt notification - multiple channel", 
+    "11 ADC - Test Continuous conversion with interrupt notification - single channel", 
+    "12 ADC - Test Continuous conversion with interrupt notification - multiple channel", 
     "13 ADC/DAC - Sample the ADC and route the samples to the DAC", 
     "**************************************",
     "Enter the demo number to execute followed by the return key: "     
@@ -370,7 +370,7 @@ void runDacSingleConversion() {
     int n;
     uint8_t buffer[1000];
 
-    n = sprintf((char *)buffer, "Measure DAC Channel 2 -> PA5 and observe 1.56V (0x7ff)\r\n");
+    n = sprintf((char *)buffer, "Measure DAC Channel 2 -> PA5 and observe 1.65V (0x7ff)\r\n");
     USART_Write(USART2, buffer, n);  
     
     dacInit(); 
